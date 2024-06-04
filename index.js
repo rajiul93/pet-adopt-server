@@ -84,6 +84,7 @@ async function run() {
 
     const userCollection = client.db("petAdoption").collection("usersCollection");
     const petAdoptCollection = client.db("petAdoption").collection("petAdoptCollection");
+    const adoptRequestCollection = client.db("petAdoption").collection("adoptRequestCollection");
 
 
 
@@ -142,7 +143,12 @@ app.post("/adopt-post" , async(req, res)=>{
   const result = await petAdoptCollection.insertOne(petInfo)
   res.send(result)
 })
-
+// request fod adopt
+app.post("/adopt-request" , async(req, res)=>{
+  const adoptersInfo = req.body;
+  const result = await adoptRequestCollection.insertOne(adoptersInfo)
+  res.send(result)
+})
 
 
 
