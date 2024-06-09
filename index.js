@@ -10,7 +10,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER_NAME}:${process.env.DB_PASSWORD}@cluster0.hefn8jo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:5174"],
+  origin: ["http://localhost:5173", "http://localhost:5174","https://pet-adoption-go.netlify.app"],
   credentials: true,
   optionSuccessStatus: 200,
 };
@@ -272,7 +272,7 @@ app.get("/all-pets", async (req, res) => {
 
 
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
