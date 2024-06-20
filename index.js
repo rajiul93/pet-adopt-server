@@ -119,6 +119,15 @@ async function run() {
       const result = await petAdoptCollection.find().toArray();
       res.send(result);
     });
+    // get pet find by category
+    app.get("/pet-category/:category", async (req, res) => {
+      const finderCategory = req.params.category;
+      console.log(finderCategory);
+      const query = { category: finderCategory };
+      const result = await petAdoptCollection.find(query).toArray();
+      res.send(result);
+    });
+
     app.get("/adopts/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -161,8 +170,8 @@ async function run() {
     // delete out pet
     app.delete("/adopt/:id", async (req, res) => {
       const id = req.params.id;
-      const query  = { _id: new ObjectId(id) };
-      const result = await petAdoptCollection.deleteOne(query );
+      const query = { _id: new ObjectId(id) };
+      const result = await petAdoptCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -303,12 +312,23 @@ async function run() {
 
     app.get("/pets-limit", async (req, res) => {
       const getCategory = req.query.category;
-
+      const search = req.query.search;
       const page = parseInt(req.query.page);
       const limit = parseInt(req.query.limit);
-      console.log("getCategory", getCategory);
+      // this section for text search
+      
+      if (search.length > 0) {
+        const result = await petAdoptCollection.find().toArray();
 
-      if (getCategory) {
+        const filteredProducts = result.filter(
+          (product) => product.name === search
+        );
+        const length = filteredProducts.length;
+        return res.send(filteredProducts);
+      }
+      // .....................................................................
+
+      else if (getCategory) {
         const filter = { category: getCategory };
         const result = await petAdoptCollection
           .find(filter)
