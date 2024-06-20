@@ -10,7 +10,11 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER_NAME}:${process.env.DB_PASSWORD}@cluster0.hefn8jo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 const corsOptions = {
-  origin: ["http://localhost:5173", "http://localhost:5174","https://pet-adoption-go.netlify.app"],
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "https://pet-adoption-go.netlify.app",
+  ],
   credentials: true,
   optionSuccessStatus: 200,
 };
@@ -65,10 +69,18 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    const userCollection = client.db("petAdoption").collection("usersCollection");
-    const petAdoptCollection = client.db("petAdoption").collection("petAdoptCollection");
-    const adoptRequestCollection = client.db("petAdoption").collection("adoptRequestCollection");
-    const campaignCollection = client.db("petAdoption").collection("campaignCollection");
+    const userCollection = client
+      .db("petAdoption")
+      .collection("usersCollection");
+    const petAdoptCollection = client
+      .db("petAdoption")
+      .collection("petAdoptCollection");
+    const adoptRequestCollection = client
+      .db("petAdoption")
+      .collection("adoptRequestCollection");
+    const campaignCollection = client
+      .db("petAdoption")
+      .collection("campaignCollection");
 
     app.put("/user", async (req, res) => {
       const userData = req.body;
@@ -146,6 +158,14 @@ async function run() {
       res.send(result);
     });
 
+    // delete out pet
+    app.delete("/adopt/:id", async (req, res) => {
+      const id = req.params.id;
+      const query  = { _id: new ObjectId(id) };
+      const result = await petAdoptCollection.deleteOne(query );
+      res.send(result);
+    });
+
     app.get("/adopt-request/:email", async (req, res) => {
       const email = req.params;
       const query = { adoptersEmail: email.email };
@@ -171,6 +191,27 @@ async function run() {
       );
       res.send(result);
     });
+    // pet document update
+    app.patch("/adopt-update/:id", async (req, res) => {
+      const id = req.params.id;
+      const data = req.body;
+      const filter = { _id: new ObjectId(id) };
+
+      const updateDoc = {
+        $set: {
+          ...data,
+        },
+      };
+
+      const options = { upsert: true };
+      const result = await petAdoptCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
+
     app.delete("/adopt-request/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -188,8 +229,17 @@ async function run() {
     });
     app.get("/donation-for-post/:id", async (req, res) => {
       const id = req.params.id;
-      const query = {_id: new ObjectId(id)}
-      const result = await campaignCollection.findOne(query)
+      const query = { _id: new ObjectId(id) };
+      const result = await campaignCollection.findOne(query);
+      res.send(result);
+    });
+
+    // get our campaign
+    app.get("/my-campaign/:email", async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const query = { userEmail: email };
+      const result = await campaignCollection.find(query).toArray();
       res.send(result);
     });
 
@@ -199,7 +249,7 @@ async function run() {
       res.send(result);
     });
 
-     // .............................................................
+    // .............................................................
     // Admin all api
     // .............................................................
     app.get("/all-user", async (req, res) => {
@@ -207,69 +257,75 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/user-update/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const user = await userCollection.findOne(query);
 
-    
-app.patch('/user-update/:id', async (req, res)=>{ 
-  const id = req.params.id 
-  const query = {_id: new ObjectId(id)}
-const user = await userCollection.findOne(query)
- 
-  if (user) {
-    if (user.role === "user") {
-      const result = await userCollection.updateOne(query, {
-        $set: { role: "Admin" },
-      });
-      return res.send(result);
-    } else {
-      return res.send({status:"isExist"});
-    }
-  }
-  res.send({status:"success"})
-})
-app.delete('/user-update/:id', async (req, res)=>{ 
-  const id = req.params.id 
-  const query = {_id: new ObjectId(id)}
-const user = await userCollection.findOne(query)
- 
-  if (user) {
-    if (user.role === "Admin") {
-      const result = await userCollection.updateOne(query, {
-        $set: { role: "user" },
-      });
-      return res.send(result);
-    } else {
-      return res.send({status:"isExist"});
-    }
-  }
-  res.send({status:"success"})
-})
+      if (user) {
+        if (user.role === "user") {
+          const result = await userCollection.updateOne(query, {
+            $set: { role: "Admin" },
+          });
+          return res.send(result);
+        } else {
+          return res.send({ status: "isExist" });
+        }
+      }
+      res.send({ status: "success" });
+    });
+    app.delete("/user-update/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const user = await userCollection.findOne(query);
 
-// get all pet
+      if (user) {
+        if (user.role === "Admin") {
+          const result = await userCollection.updateOne(query, {
+            $set: { role: "user" },
+          });
+          return res.send(result);
+        } else {
+          return res.send({ status: "isExist" });
+        }
+      }
+      res.send({ status: "success" });
+    });
 
-app.get("/all-pets", async (req, res) => { 
-  const result = await petAdoptCollection.find().toArray();
-  res.send(result);
-});
+    // get all pet
 
+    app.get("/all-pets", async (req, res) => {
+      const result = await petAdoptCollection.find().toArray();
+      res.send(result);
+    });
 
+    // ifinity ascrool
 
+    app.get("/pets-limit", async (req, res) => {
+      const getCategory = req.query.category;
 
+      const page = parseInt(req.query.page);
+      const limit = parseInt(req.query.limit);
+      console.log("getCategory", getCategory);
 
+      if (getCategory) {
+        const filter = { category: getCategory };
+        const result = await petAdoptCollection
+          .find(filter)
+          .skip(page * limit)
+          .limit(limit)
+          .toArray();
+        res.send(result);
+        return;
+      }
+      const result = await petAdoptCollection
+        .find()
+        .skip(page * limit)
+        .limit(limit)
+        .toArray();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+      res.send(result);
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
@@ -288,3 +344,14 @@ run().catch(console.dir);
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
+// if (!getCategory) {
+//   } else{
+//   const filter = {category:getCategory}
+//   const result = await petAdoptCollection
+//   .find(filter)
+//   .skip(page * limit)
+//   .limit(limit)
+//   .toArray();
+// res.send(result);
+
+//  }
