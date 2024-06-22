@@ -2,6 +2,8 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const jwt = require("jsonwebtoken");
+const stripe = require("stripe")(`${process.env.DB_PAYMENT_SECRET}`);
+
 const port = process.env.PORT || 5000;
 const cookieParser = require("cookie-parser");
 const app = express();
@@ -58,6 +60,40 @@ app.get("/logout", async (req, res) => {
   }
 });
 
+
+const verifyToken = async (req, res, next) => {
+  const token = req.cookies?.token;
+  console.log(token);
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  jwt.verify(token, process.env.DB_SECRET, (err, decoded) => {
+    if (err) {
+      console.log(err);
+      return res.status(401).send({ message: "unauthorized access" });
+    }
+    req.user = decoded;
+    next();
+  });
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
@@ -69,18 +105,14 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    const userCollection = client
-      .db("petAdoption")
-      .collection("usersCollection");
-    const petAdoptCollection = client
-      .db("petAdoption")
-      .collection("petAdoptCollection");
-    const adoptRequestCollection = client
-      .db("petAdoption")
-      .collection("adoptRequestCollection");
-    const campaignCollection = client
-      .db("petAdoption")
-      .collection("campaignCollection");
+    const userCollection = client.db("petAdoption").collection("usersCollection");
+    const petAdoptCollection = client.db("petAdoption").collection("petAdoptCollection");
+    const adoptRequestCollection = client.db("petAdoption").collection("adoptRequestCollection");
+    const campaignCollection = client.db("petAdoption").collection("campaignCollection"); 
+    const donatedCollection = client.db("petAdoption").collection("donatedCollection"); 
+
+   
+
 
     app.put("/user", async (req, res) => {
       const userData = req.body;
@@ -110,6 +142,19 @@ async function run() {
       const result = await userCollection.updateOne(query, updateDoc, option);
       res.send(result);
     });
+    app.get("/user-admin", async (req, res) => {
+      const email = req.query.email;
+      console.log(email)
+      
+      // if (email !== req.user.email) { 
+      //   return res.status(403).send({message:"forbidden access"})
+      // }
+      const query = {email:email} 
+      const result = await userCollection.findOne(query);
+
+      res.send(result);
+    });
+
 
     // ..................................................
     // pet adopt section start
@@ -128,16 +173,31 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/adopts/:id", async (req, res) => {
+    app.get("/adopts/:id", verifyToken, async (req, res) => {
+
+
+      const email = req.query.email;
+      console.log("first,", email,req.user.email)
+      if (email !== req.user.email) {
+        console.log("you are thife")
+        return res.status(403).send({message:"forbidden access"})
+      }
+
+
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const result = await petAdoptCollection.findOne(filter);
       res.send(result);
     });
     // amar post kora pet
-    app.get("/my-adopt-pet/:email", async (req, res) => {
-      const email = req.params;
-      const query = { email: email.email };
+    app.get("/my-adopt-pet/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+
+      if (email !== req.user.email) { 
+        return res.status(403).send({message:"forbidden access"})
+      }
+
+      const query = { email: email };
       const result = await petAdoptCollection.find(query).toArray();
       res.send(result);
     });
@@ -168,7 +228,14 @@ async function run() {
     });
 
     // delete out pet
-    app.delete("/adopt/:id", async (req, res) => {
+    app.delete("/adopt/:id", verifyToken, async (req, res) => {
+       
+      const email = req.query.email;
+      // console.log("first,", email)
+      if (email !== req.user.email) {
+        console.log("you are thife")
+        return res.status(403).send({message:"forbidden access"})
+      }
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await petAdoptCollection.deleteOne(query);
@@ -204,6 +271,7 @@ async function run() {
     app.patch("/adopt-update/:id", async (req, res) => {
       const id = req.params.id;
       const data = req.body;
+
       const filter = { _id: new ObjectId(id) };
 
       const updateDoc = {
@@ -233,8 +301,21 @@ async function run() {
     // campaign area start
     // .............................................................
     app.get("/donation-for-post", async (req, res) => {
-      const result = await campaignCollection.find().toArray();
-      res.send(result);
+
+// to do
+
+const page = parseInt(req.query.page);
+const limit = parseInt(req.query.limit);
+
+const result = await campaignCollection
+.find()
+.skip(page * limit)
+.limit(limit)
+.toArray();
+
+res.send(result);
+      // const result = await campaignCollection.find().toArray();
+      // res.send(result);
     });
     app.get("/donation-for-post/:id", async (req, res) => {
       const id = req.params.id;
@@ -251,11 +332,109 @@ async function run() {
       const result = await campaignCollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/single-campaign/:id", async (req, res) => {
+      const id = req.params.id; 
+      const query = { _id:new ObjectId(id) };
+      const result = await campaignCollection.findOne(query);
+      res.send(result);
+    });
 
+
+    app.delete("/delete-campaign/:id",verifyToken, async(req, res)=>{
+      const id = req.params.id;
+      const email = req.query.email; 
+      if (email !== req.user.email) {
+        console.log("you are thife")
+        return res.status(403).send({message:"forbidden access"})
+      }
+      const filter = {_id:new ObjectId(id)}
+      const result = await campaignCollection.deleteOne(filter);
+      res.send(result)
+      
+    })
+// ...........................................................................
     app.post("/donation-for-post", async (req, res) => {
       const petInfo = req.body;
       const result = await campaignCollection.insertOne(petInfo);
       res.send(result);
+    });
+    app.patch("/donation-update/:id", async (req, res) => {
+      const newData = req.body;
+      const id = req.params.id; 
+      console.log(newData, id)
+      const filter = { _id:new ObjectId(id) };
+      const option = { upsert: true };
+      const updateDoc = {
+        $set: {
+          ...newData, 
+        },
+      };
+      const result = await campaignCollection.updateOne(filter, updateDoc, option);
+      res.send(result);
+      
+    });
+
+
+
+
+
+    // ..............................................................................
+    // donation api start
+    // ..............................................................................
+    app.patch("/donation-money/:id", async (req, res) => {
+      const data = req.body;
+
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      console.log(id)
+      const findCampaign = await campaignCollection.findOne(filter);
+      let amount = findCampaign.amount;
+      amount.push(data);
+      const options = { upsert: true };
+      const updateDoc = {
+        $set: {
+          amount: amount,
+        },
+      };
+      const result = await campaignCollection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+      res.send(result);
+    });
+// donated information
+app.get("/my-donation/:email", async(req,res)=>{ 
+  const email = req.params.email;
+  console.log(email)
+  const query  =  {email:email}
+  const result =await donatedCollection.find(query ).toArray()
+  res.send(result)
+})
+app.post("/my-donation", async(req,res)=>{
+  const data = req.body;
+  const result =await donatedCollection.insertOne(data)
+  res.send(result)
+})
+    // payment intent ..................................................................................................
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      // console.log(amount)
+      // Create a PaymentIntent with the order amount and currency
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+        // automatic_payment_methods: {
+        //   enabled: true,
+        // },
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
     });
 
     // .............................................................
@@ -316,7 +495,7 @@ async function run() {
       const page = parseInt(req.query.page);
       const limit = parseInt(req.query.limit);
       // this section for text search
-      
+
       if (search.length > 0) {
         const result = await petAdoptCollection.find().toArray();
 
@@ -327,7 +506,6 @@ async function run() {
         return res.send(filteredProducts);
       }
       // .....................................................................
-
       else if (getCategory) {
         const filter = { category: getCategory };
         const result = await petAdoptCollection
@@ -364,14 +542,3 @@ run().catch(console.dir);
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
-// if (!getCategory) {
-//   } else{
-//   const filter = {category:getCategory}
-//   const result = await petAdoptCollection
-//   .find(filter)
-//   .skip(page * limit)
-//   .limit(limit)
-//   .toArray();
-// res.send(result);
-
-//  }
