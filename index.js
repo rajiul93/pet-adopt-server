@@ -332,6 +332,13 @@ res.send(result);
       const result = await campaignCollection.find(query).toArray();
       res.send(result);
     });
+    app.get("/my-campaign/:id", async (req, res) => {
+      const email = req.params.email;
+      console.log(email);
+      const query = { userEmail: email };
+      const result = await campaignCollection.find(query).toArray();
+      res.send(result);
+    });
     app.get("/single-campaign/:id", async (req, res) => {
       const id = req.params.id; 
       const query = { _id:new ObjectId(id) };
@@ -347,6 +354,15 @@ res.send(result);
         console.log("you are thife")
         return res.status(403).send({message:"forbidden access"})
       }
+      const filter = {_id:new ObjectId(id)}
+      const result = await campaignCollection.deleteOne(filter);
+      res.send(result)
+      
+    })
+    app.delete("/delete-campaign-admin/:id", async(req, res)=>{
+      const id = req.params.id;
+  
+    
       const filter = {_id:new ObjectId(id)}
       const result = await campaignCollection.deleteOne(filter);
       res.send(result)
