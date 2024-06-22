@@ -241,6 +241,15 @@ async function run() {
       const result = await petAdoptCollection.deleteOne(query);
       res.send(result);
     });
+    
+    app.delete("/adopt-delete-admin/:id",  async (req, res) => {
+       
+   
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await petAdoptCollection.deleteOne(query);
+      res.send(result);
+    });
 
     app.get("/adopt-request/:email", async (req, res) => {
       const email = req.params;
